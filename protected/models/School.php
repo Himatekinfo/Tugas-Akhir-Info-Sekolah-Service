@@ -24,9 +24,17 @@ class School extends CActiveRecord {
     }
 
     public function afterFind() {
+        $this->getMetaData()->columns = array_merge($this->getMetaData()->columns, array("CostDetails" => ""));
         $this->getMetaData()->columns = array_merge($this->getMetaData()->columns, array("Distance" => 0));
 
         $this->Distance = 0;
+
+        $model = SchoolCostDetails::model()->findAll("SchoolId=" . $this->Id);
+        foreach ($model as $value) {
+            $this->CostDetails .= $value->Description . ", ";
+        }
+
+        $this->CostDetails = substr($this->CostDetails, 0, -2);
         return true;
     }
 
@@ -73,6 +81,7 @@ class School extends CActiveRecord {
         // class name for the relations automatically generated below.
         return array(
             'category' => array(self::BELONGS_TO, 'Lookup', 'CategoryId'),
+            'schoolCost' => array(self::HAS_MANY, 'SchoolCostDetails', 'SchoolId'),
         );
     }
 
