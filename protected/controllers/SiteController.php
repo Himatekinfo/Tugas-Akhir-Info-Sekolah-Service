@@ -143,11 +143,148 @@ class SiteController extends Controller {
         return $model2;
     }
 
+    public function actionImportNodes() {
+        set_time_limit(0);
+        // Get schools that haven't been processed at all
+        foreach (School::model()->findAll() as $school) {
+            if (Batch::model()->find("SchoolId=" . $school->Id) === null) {
+                $batch = new Batch();
+                $batch->SchoolId = $school->Id;
+                $batch->save();
+            }
+        }
+
+
+        // Process the schools
+        //http://maps.googleapis.com/maps/api/directions/json?origin=-6.2087397,106.8456068&destination=-6.600021799999999,106.7999617&sensor=false&alternatives=true&region=id
+        $origin = "-6.2087397,106.8456068";
+        $destination = "-6.560857,106.792172"; // UIKA's coordinate
+        foreach (Batch::model()->findAll("LastModified IS NULL") as $batch) {
+            $transaction = Yii::app()->db->beginTransaction();
+            try {
+                $origin = $batch->school->node->Latitude . "," . $batch->school->node->Longitude;
+                $url = "http://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&sensor=false&alternatives=true&region=id";
+                $result = CJSON::decode(file_get_contents($url));
+                $routes = $result ["routes"];
+                $status = $result ["status"];
+                if ($status != "OK") {
+                    throw new CException("Error from service with status: " . $status);
+                }
+                foreach ($routes as $route) {
+                    $beginningOfNewRoute = true;
+                    foreach ($route['legs'] as $leg) {
+                        $startLocationLatitude = $leg['start_location']['lat'];
+                        $endLocationLatitude = $leg['end_location']['lat'];
+                        $startLocationLongitude = $leg['start_location']['lng'];
+                        $endLocationLongitude = $leg['end_location']['lng'];
+
+                        $startLocation = Node::model()->find("Latitude=$startLocationLatitude AND Longitude=$startLocationLongitude");
+                        if ($startLocation === null) {
+                            $startLocation = new Node();
+                            $startLocation->Latitude = $startLocationLatitude;
+                            $startLocation->Longitude = $startLocationLongitude;
+                            $startLocation->save();
+                        }
+                        foreach ($leg['steps'] as $step) {
+                            $startLatitude = $step['start_location']['lat'];
+                            $endLatitude = $step['end_location']['lat'];
+                            $startLongitude = $step['start_location']['lng'];
+                            $endLongitude = $step['end_location']['lng'];
+
+                            // Get start coordinate and save it if node doesn't exist
+                            $startNode = Node::model()->find("Latitude=$startLatitude AND Longitude=$startLongitude");
+                            if ($startNode === null) {
+                                $startNode = new Node();
+                                $startNode->Latitude = $startLatitude;
+                                $startNode->Longitude = $startLongitude;
+                                $startNode->save();
+                            }
+
+                            // Get end coordinate and save it if node doesn't exist
+                            $endNode = Node::model()->find("Latitude=$endLatitude AND Longitude=$endLongitude");
+                            if (Node::model()->find("Latitude=$endLatitude AND Longitude=$endLongitude") === null) {
+                                $endNode = new Node();
+                                $endNode->Latitude = $endLatitude;
+                                $endNode->Longitude = $endLongitude;
+                                $endNode->save();
+                            }
+
+                            if ($beginningOfNewRoute) {
+                                $beginningOfNewRoute = false;
+                                if ($startLocation->Id != $batch->school->NodeId) {
+                                    NeighboringNode::createIfNotExist($startLocation->Id, $batch->school->NodeId);
+                                }
+                                if ($startNode->Id != $startLocation->Id) {
+                                    NeighboringNode::createIfNotExist($startNode->Id, $startLocation->Id);
+                                }
+                            }
+                            NeighboringNode::createIfNotExist($startNode->Id, $endNode->Id, $step['distance']['value']);
+                        }
+                        $endLocation = Node::model()->find("Latitude=$endLocationLatitude AND Longitude=$endLocationLongitude");
+
+                        if ($endNode->Id != $endLocation->Id) {
+                            NeighboringNode::createIfNotExist($endNode->Id, $endLocation->NodeId);
+                        }
+                    }
+                }
+                $batch->LastModified = date(Yii::app()->params->dbDateFormat);
+                $batch->save();
+                $transaction->commit();
+            } catch (Exception $ex) {
+                $transaction->rollback();
+                $this->renderText($ex->getMessage() . "<br /> " . $ex->getTraceAsString());
+            }
+        }
+
+        $this->renderText("Done");
+    }
+
+    public function actionViewMap() {
+        $this->render('map');
+    }
+
+    public function actionRoute() {
+        /*
+         * End Node:
+         *  - Latitude: -6.5607984
+         *  - Longitude: 106.7920002
+         *  - Current Id: 3169
+         */
+        $startNodeId = 215;
+        $endNodeId = Node::model()->find("Latitude=-6.5607984 AND Longitude=106.7920002")->Id;
+
+//        $aRoutes = array(
+//            array(0, 0, 0),
+//            array(0, 1, 10),
+//            array(0, 3, 30), // use something like array(3,0,20) to define a two way map
+//            array(0, 4, 100),
+//            array(1, 1, 0),
+//            array(1, 2, 50),
+//            array(2, 2, 0),
+//            array(2, 4, 10),
+//            array(3, 3, 0),
+//            array(3, 2, 20),
+//            array(3, 4, 60),
+//            array(4, 4, 0),
+//        );
+//        $oDijk = new DijkstraAlgorithm(0, $aRoutes, 2); // startPoint = 0
+
+        $oDijk = new DijkstraAlgorithm($startNodeId, $endNodeId); // startPoint = 0
+
+        var_dump($oDijk->getPath());
+        print("<br /><br />");
+        var_dump($oDijk->getDistance());
+        print("<br /><br />");
+        print_r($oDijk->getPolyline());
+    }
+
     public function actionSchoolList($id = 0, $lat = 0, $lng = 0, $search = null) {
-        if ($lat == 0)
+        if ($lat == 0) {
             $lat = -6.572486;
-        if ($lng == 0)
+        }
+        if ($lng == 0) {
             $lng = 106.748271;
+        }
         set_time_limit(0);
         $search_query = $id == 0 ? "" : "CategoryId=$id";
         if ($search != null) {
@@ -233,4 +370,3 @@ class SiteController extends Controller {
     }
 
 }
-

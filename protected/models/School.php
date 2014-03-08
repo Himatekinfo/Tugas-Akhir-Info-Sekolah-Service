@@ -6,16 +6,21 @@
  * The followings are the available columns in table 't_school':
  * @property string $Id
  * @property string $Name
- * @property string $Cost
+ * @property string $InitialCost
+ * @property string $PeriodicalCost
  * @property string $Accreditation
  * @property string $Website
  * @property string $CategoryId
  * @property string $GoogleId
- * @property double $Latitude
- * @property double $Longitude
+ * @property string $Address
+ * @property string $IconUrl
+ * @property string $NodeId
  *
  * The followings are the available model relations:
+ * @property Batch[] $batches
  * @property Lookup $category
+ * @property Node $node
+ * @property SchoolCostDetails[] $schoolCostDetails
  */
 class School extends CActiveRecord {
 
@@ -80,8 +85,10 @@ class School extends CActiveRecord {
         // NOTE: you may need to adjust the relation name and the related
         // class name for the relations automatically generated below.
         return array(
+            'batches' => array(self::HAS_MANY, 'Batch', 'SchoolId'),
             'category' => array(self::BELONGS_TO, 'Lookup', 'CategoryId'),
-            'schoolCost' => array(self::HAS_MANY, 'SchoolCostDetails', 'SchoolId'),
+            'node' => array(self::BELONGS_TO, 'Node', 'NodeId'),
+            'schoolCostDetails' => array(self::HAS_MANY, 'SchoolCostDetails', 'SchoolId'),
         );
     }
 
@@ -113,12 +120,15 @@ class School extends CActiveRecord {
 
         $criteria->compare('Id', $this->Id, true);
         $criteria->compare('Name', $this->Name, true);
+        $criteria->compare('InitialCost', $this->InitialCost, true);
+        $criteria->compare('PeriodicalCost', $this->PeriodicalCost, true);
         $criteria->compare('Accreditation', $this->Accreditation, true);
         $criteria->compare('Website', $this->Website, true);
         $criteria->compare('CategoryId', $this->CategoryId, true);
         $criteria->compare('GoogleId', $this->GoogleId, true);
-        $criteria->compare('Latitude', $this->Latitude);
-        $criteria->compare('Longitude', $this->Longitude);
+        $criteria->compare('Address', $this->Address, true);
+        $criteria->compare('IconUrl', $this->IconUrl, true);
+        $criteria->compare('NodeId', $this->NodeId, true);
 
         return new CActiveDataProvider($this, array(
             'criteria' => $criteria,
@@ -126,4 +136,3 @@ class School extends CActiveRecord {
     }
 
 }
-

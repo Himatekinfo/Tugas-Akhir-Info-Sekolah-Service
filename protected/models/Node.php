@@ -1,23 +1,25 @@
 <?php
 
 /**
- * This is the model class for table "t_school_cost_details".
+ * This is the model class for table "t_node".
  *
- * The followings are the available columns in table 't_school_cost_details':
+ * The followings are the available columns in table 't_node':
  * @property string $Id
- * @property string $SchoolId
+ * @property double $Latitude
+ * @property double $Longitude
  * @property string $Description
- * @property string $Price
  *
  * The followings are the available model relations:
- * @property School $school
+ * @property NeighboringNode[] $neighboringNodes
+ * @property NeighboringNode[] $neighboringNodes1
+ * @property School[] $schools
  */
-class SchoolCostDetails extends CActiveRecord
+class Node extends CActiveRecord
 {
 	/**
 	 * Returns the static model of the specified AR class.
 	 * @param string $className active record class name.
-	 * @return SchoolCostDetails the static model class
+	 * @return Node the static model class
 	 */
 	public static function model($className=__CLASS__)
 	{
@@ -29,7 +31,7 @@ class SchoolCostDetails extends CActiveRecord
 	 */
 	public function tableName()
 	{
-		return 't_school_cost_details';
+		return 't_node';
 	}
 
 	/**
@@ -40,12 +42,12 @@ class SchoolCostDetails extends CActiveRecord
 		// NOTE: you should only define rules for those attributes that
 		// will receive user inputs.
 		return array(
-			array('SchoolId, Description', 'required'),
-			array('SchoolId, Price', 'length', 'max'=>20),
-			array('Description', 'length', 'max'=>50),
+			array('Latitude, Longitude', 'required'),
+			array('Latitude, Longitude', 'numerical'),
+			array('Description', 'length', 'max'=>150),
 			// The following rule is used by search().
 			// Please remove those attributes that should not be searched.
-			array('Id, SchoolId, Description, Price', 'safe', 'on'=>'search'),
+			array('Id, Latitude, Longitude, Description', 'safe', 'on'=>'search'),
 		);
 	}
 
@@ -57,7 +59,9 @@ class SchoolCostDetails extends CActiveRecord
 		// NOTE: you may need to adjust the relation name and the related
 		// class name for the relations automatically generated below.
 		return array(
-			'school' => array(self::BELONGS_TO, 'School', 'SchoolId'),
+			'neighboringNodes' => array(self::HAS_MANY, 'NeighboringNode', 'NodeId'),
+			'neighboringNodes1' => array(self::HAS_MANY, 'NeighboringNode', 'NeighboringNodeId'),
+			'schools' => array(self::HAS_MANY, 'School', 'NodeId'),
 		);
 	}
 
@@ -68,9 +72,9 @@ class SchoolCostDetails extends CActiveRecord
 	{
 		return array(
 			'Id' => 'ID',
-			'SchoolId' => 'School',
+			'Latitude' => 'Latitude',
+			'Longitude' => 'Longitude',
 			'Description' => 'Description',
-			'Price' => 'Price',
 		);
 	}
 
@@ -86,9 +90,9 @@ class SchoolCostDetails extends CActiveRecord
 		$criteria=new CDbCriteria;
 
 		$criteria->compare('Id',$this->Id,true);
-		$criteria->compare('SchoolId',$this->SchoolId,true);
+		$criteria->compare('Latitude',$this->Latitude);
+		$criteria->compare('Longitude',$this->Longitude);
 		$criteria->compare('Description',$this->Description,true);
-		$criteria->compare('Price',$this->Price,true);
 
 		return new CActiveDataProvider($this, array(
 			'criteria'=>$criteria,

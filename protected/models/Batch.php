@@ -1,23 +1,22 @@
 <?php
 
 /**
- * This is the model class for table "t_school_cost_details".
+ * This is the model class for table "t_batch".
  *
- * The followings are the available columns in table 't_school_cost_details':
+ * The followings are the available columns in table 't_batch':
  * @property string $Id
  * @property string $SchoolId
- * @property string $Description
- * @property string $Price
+ * @property string $LastModified
  *
  * The followings are the available model relations:
  * @property School $school
  */
-class SchoolCostDetails extends CActiveRecord
+class Batch extends CActiveRecord
 {
 	/**
 	 * Returns the static model of the specified AR class.
 	 * @param string $className active record class name.
-	 * @return SchoolCostDetails the static model class
+	 * @return Batch the static model class
 	 */
 	public static function model($className=__CLASS__)
 	{
@@ -29,7 +28,7 @@ class SchoolCostDetails extends CActiveRecord
 	 */
 	public function tableName()
 	{
-		return 't_school_cost_details';
+		return 't_batch';
 	}
 
 	/**
@@ -40,12 +39,12 @@ class SchoolCostDetails extends CActiveRecord
 		// NOTE: you should only define rules for those attributes that
 		// will receive user inputs.
 		return array(
-			array('SchoolId, Description', 'required'),
-			array('SchoolId, Price', 'length', 'max'=>20),
-			array('Description', 'length', 'max'=>50),
+			array('SchoolId', 'required'),
+			array('SchoolId', 'length', 'max'=>20),
+			array('LastModified', 'safe'),
 			// The following rule is used by search().
 			// Please remove those attributes that should not be searched.
-			array('Id, SchoolId, Description, Price', 'safe', 'on'=>'search'),
+			array('Id, SchoolId, LastModified', 'safe', 'on'=>'search'),
 		);
 	}
 
@@ -69,8 +68,7 @@ class SchoolCostDetails extends CActiveRecord
 		return array(
 			'Id' => 'ID',
 			'SchoolId' => 'School',
-			'Description' => 'Description',
-			'Price' => 'Price',
+			'LastModified' => 'Last Modified',
 		);
 	}
 
@@ -87,8 +85,7 @@ class SchoolCostDetails extends CActiveRecord
 
 		$criteria->compare('Id',$this->Id,true);
 		$criteria->compare('SchoolId',$this->SchoolId,true);
-		$criteria->compare('Description',$this->Description,true);
-		$criteria->compare('Price',$this->Price,true);
+		$criteria->compare('LastModified',$this->LastModified,true);
 
 		return new CActiveDataProvider($this, array(
 			'criteria'=>$criteria,
