@@ -250,7 +250,7 @@ class SiteController extends Controller {
          *  - Longitude: 106.7920002
          *  - Current Id: 3169
          */
-        $startNodeId = 215;
+        $startNodeId = 241;
         $endNodeId = Node::model()->find("Latitude=-6.5607984 AND Longitude=106.7920002")->Id;
 
 //        $aRoutes = array(

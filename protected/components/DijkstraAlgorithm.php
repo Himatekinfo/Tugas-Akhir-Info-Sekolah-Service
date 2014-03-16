@@ -129,7 +129,11 @@ class DijkstraAlgorithm {
                 $nodeObj = Node::model()->findByPk($node);
                 $points[] = array($nodeObj->Latitude, $nodeObj->Longitude);
             }
-            print_r($points);
+            foreach ($points as $point) {
+                print_r($point);
+                print("<br />");
+            }
+
 //            die();
 
             $polyline = EGMapPolylineEncoder::encodePoints($points);
