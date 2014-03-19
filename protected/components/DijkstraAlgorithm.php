@@ -46,17 +46,18 @@ class DijkstraAlgorithm {
         $this->createGraph($endNode, $intStartPoint);
         $aRoutes = $this->routes;
 
+        $this->startNode = $intStartPoint;
+        if ($endNode != E) {
+            $this->endNode = $endNode;
+        }
+
         // For debugging purpose, show all routes
+//        print($this->startNode . ":" . $this->endNode . "<br />");
 //        foreach ($aRoutes as $route) {
 //            print_r($route);
 //            print("<br />");
 //        }
 //        die();
-
-        $this->startNode = $intStartPoint;
-        if ($endNode != E) {
-            $this->endNode = $endNode;
-        }
 
         foreach ($aRoutes as $aRoute) {
             if (!in_array($aRoute[0], $this->points)) {
@@ -78,6 +79,14 @@ class DijkstraAlgorithm {
         $this->findPath();
     }
 
+    public function sortGraph() {
+        foreach ($this->routes as $route) {
+            $node_ids[] = $route[0];
+        }
+
+        array_multisort($node_ids, SORT_ASC, $this->routes);
+    }
+
     public function createGraph($startNodeId, $endNodeId) {
         foreach (NeighboringNode::model()->findAll("NodeId=$startNodeId OR NeighboringNodeId=$startNodeId") as $node) {
             if ($startNodeId != $endNodeId) {
@@ -88,14 +97,28 @@ class DijkstraAlgorithm {
                     $this->createGraph($node->NodeId, $endNodeId);
                 }
 
+                // Create singular node for forward route
+                $data = array($node->NodeId, $node->NodeId, 0);
+                if (!in_array($data, $this->routes)) {
+                    $this->routes[] = $data;
+                }
+
                 // Create reversed route
                 $reversedData = array($node->NeighboringNodeId, $node->NodeId, $node->Distance);
                 if (!in_array($reversedData, $this->routes)) {
                     $this->routes[] = $reversedData;
                     $this->createGraph($node->NeighboringNodeId, $endNodeId);
                 }
+
+                // Create singular node for reversed route
+                $reversedData = array($node->NeighboringNodeId, $node->NeighboringNodeId, 0);
+                if (!in_array($reversedData, $this->routes)) {
+                    $this->routes[] = $reversedData;
+                }
             }
         }
+
+        $this->sortGraph();
     }
 
     /**
@@ -106,8 +129,11 @@ class DijkstraAlgorithm {
         foreach ($this->points as $intPoint) {
             $this->fillFullPath($intPoint, $intPoint);
         }
-        if ($this->endNode !== null)
-            return $this->fullPathes[$this->endNode];
+        if ($this->endNode !== null) {
+            $bestPath = array_unique($this->fullPathes[$this->endNode]);
+
+            return $bestPath;
+        }
         return $this->fullPathes;
     }
 
@@ -129,12 +155,12 @@ class DijkstraAlgorithm {
                 $nodeObj = Node::model()->findByPk($node);
                 $points[] = array($nodeObj->Latitude, $nodeObj->Longitude);
             }
-            foreach ($points as $point) {
-                print_r($point);
-                print("<br />");
-            }
 
-//            die();
+            // For debugging purpose only
+//            foreach ($points as $point) {
+//                print_r($point);
+//                print("<br />");
+//            }
 
             $polyline = EGMapPolylineEncoder::encodePoints($points);
         }

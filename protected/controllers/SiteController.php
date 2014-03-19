@@ -253,22 +253,6 @@ class SiteController extends Controller {
         $startNodeId = 241;
         $endNodeId = Node::model()->find("Latitude=-6.5607984 AND Longitude=106.7920002")->Id;
 
-//        $aRoutes = array(
-//            array(0, 0, 0),
-//            array(0, 1, 10),
-//            array(0, 3, 30), // use something like array(3,0,20) to define a two way map
-//            array(0, 4, 100),
-//            array(1, 1, 0),
-//            array(1, 2, 50),
-//            array(2, 2, 0),
-//            array(2, 4, 10),
-//            array(3, 3, 0),
-//            array(3, 2, 20),
-//            array(3, 4, 60),
-//            array(4, 4, 0),
-//        );
-//        $oDijk = new DijkstraAlgorithm(0, $aRoutes, 2); // startPoint = 0
-
         $oDijk = new DijkstraAlgorithm($startNodeId, $endNodeId); // startPoint = 0
 
         var_dump($oDijk->getPath());
@@ -279,13 +263,13 @@ class SiteController extends Controller {
     }
 
     public function actionSchoolList($id = 0, $lat = 0, $lng = 0, $search = null) {
+        set_time_limit(0);
         if ($lat == 0) {
             $lat = -6.572486;
         }
         if ($lng == 0) {
             $lng = 106.748271;
         }
-        set_time_limit(0);
         $search_query = $id == 0 ? "" : "CategoryId=$id";
         if ($search != null) {
             $search_query = strlen($search_query) == 0 ? "" : "$search_query AND ";
@@ -293,8 +277,28 @@ class SiteController extends Controller {
         }
         $model = School::model()->findAll($search_query);
         if ($model !== null) {
+            $endNodeId = Node::model()->find("Latitude=-6.5607984 AND Longitude=106.7920002")->Id;
             foreach ($model as &$value) {
-                $value->Distance = DistanceAlgorithm::DrivingDistanceBetweenPlaces($lng, $lat, $value->Longitude, $value->Latitude);
+                $startNodeId = $value->Id;
+
+                $cacheDatas = DistanceCache::model()->find("StartNodeId=$startNodeId AND EndNodeId=$endNodeId");
+                if ($cacheDatas !== null) {
+                    $value->Distance = $cacheDatas->Distance;
+                    $value->EncodedPolyline = $cacheDatas->EncodedPolyline;
+                } else {
+                    $oDijk = new DijkstraAlgorithm($startNodeId, $endNodeId);
+                    $value->Distance = $oDijk->getDistance();
+                    $value->EncodedPolyline = $oDijk->getPolyline();
+
+                    $modelDistance = new DistanceCache();
+                    $modelDistance->StartNodeId = $startNodeId;
+                    $modelDistance->EndNodeId = $endNodeId;
+                    $modelDistance->Distance = $value->Distance;
+                    $modelDistance->EncodedPolyline = $value->EncodedPolyline;
+                    $modelDistance->save();
+                }
+                $value->Distance = $value->Distance / 1000;
+                $value->EncodedPolyline = trim($value->EncodedPolyline);
             }
             $model = $this->sortModel($model, "Distance");
         }

@@ -31,8 +31,13 @@ class School extends CActiveRecord {
     public function afterFind() {
         $this->getMetaData()->columns = array_merge($this->getMetaData()->columns, array("CostDetails" => ""));
         $this->getMetaData()->columns = array_merge($this->getMetaData()->columns, array("Distance" => 0));
+        $this->getMetaData()->columns = array_merge($this->getMetaData()->columns, array("EncodedPolyline" => ""));
+        $this->getMetaData()->columns = array_merge($this->getMetaData()->columns, array("Latitude" => "0"));
+        $this->getMetaData()->columns = array_merge($this->getMetaData()->columns, array("Longitude" => "0"));
 
         $this->Distance = 0;
+        $this->Latitude = $this->node->Latitude;
+        $this->Longitude = $this->node->Longitude;
 
         $model = SchoolCostDetails::model()->findAll("SchoolId=" . $this->Id);
         foreach ($model as $value) {
