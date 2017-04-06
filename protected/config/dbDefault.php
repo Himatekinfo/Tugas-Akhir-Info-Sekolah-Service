@@ -1,7 +1,7 @@
 <?php
 
 return array(
-    'connectionString' => 'mysql:host=localhost:3307;dbname=d_info_sekolah',
+    'connectionString' => 'mysql:host=localhost:3307;dbname=library',
     'emulatePrepare' => true,
     'username' => 'root',
     'password' => 'qwe-123',

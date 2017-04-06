@@ -145,95 +145,77 @@ class SiteController extends Controller {
 
     public function actionImportNodes() {
         set_time_limit(0);
-        // Get schools that haven't been processed at all
-        foreach (School::model()->findAll() as $school) {
-            if (Batch::model()->find("SchoolId=" . $school->Id) === null) {
-                $batch = new Batch();
-                $batch->SchoolId = $school->Id;
-                $batch->save();
-            }
-        }
-
 
         // Process the schools
         //http://maps.googleapis.com/maps/api/directions/json?origin=-6.2087397,106.8456068&destination=-6.600021799999999,106.7999617&sensor=false&alternatives=true&region=id
-        $origin = "-6.2087397,106.8456068";
-        $destination = "-6.560857,106.792172"; // UIKA's coordinate
-        foreach (Batch::model()->findAll("LastModified IS NULL") as $batch) {
-            $transaction = Yii::app()->db->beginTransaction();
-            try {
-                $origin = $batch->school->node->Latitude . "," . $batch->school->node->Longitude;
-                $url = "http://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&sensor=false&alternatives=true&region=id";
-                $result = CJSON::decode(file_get_contents($url));
-                $routes = $result ["routes"];
-                $status = $result ["status"];
-                if ($status != "OK") {
-                    throw new CException("Error from service with status: " . $status);
-                }
-                foreach ($routes as $route) {
-                    $beginningOfNewRoute = true;
-                    foreach ($route['legs'] as $leg) {
-                        $startLocationLatitude = $leg['start_location']['lat'];
-                        $endLocationLatitude = $leg['end_location']['lat'];
-                        $startLocationLongitude = $leg['start_location']['lng'];
-                        $endLocationLongitude = $leg['end_location']['lng'];
+        $origin = $_GET['origin'];  // "-6.2087397,106.8456068";
+        $destination = $_GET['destination']; // "-6.560857,106.792172"; // UIKA's coordinate
 
-                        $startLocation = Node::model()->find("Latitude=$startLocationLatitude AND Longitude=$startLocationLongitude");
-                        if ($startLocation === null) {
-                            $startLocation = new Node();
-                            $startLocation->Latitude = $startLocationLatitude;
-                            $startLocation->Longitude = $startLocationLongitude;
-                            $startLocation->save();
-                        }
-                        foreach ($leg['steps'] as $step) {
-                            $startLatitude = $step['start_location']['lat'];
-                            $endLatitude = $step['end_location']['lat'];
-                            $startLongitude = $step['start_location']['lng'];
-                            $endLongitude = $step['end_location']['lng'];
+        $originCoordinate = explode(",", $origin);
+        $destinationCoordinate = explode(",", $destination);
 
-                            // Get start coordinate and save it if node doesn't exist
-                            $startNode = Node::model()->find("Latitude=$startLatitude AND Longitude=$startLongitude");
-                            if ($startNode === null) {
-                                $startNode = new Node();
-                                $startNode->Latitude = $startLatitude;
-                                $startNode->Longitude = $startLongitude;
-                                $startNode->save();
+        $transaction = Yii::app()->db->beginTransaction();
+        try {
+            $url = "http://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&sensor=false&alternatives=true&region=id";
+            // echo $url;
+            $result = CJSON::decode(file_get_contents($url));
+            $routes = $result ["routes"];
+            $status = $result ["status"];
+            if ($status != "OK") {
+                throw new CException("Error from service with status: " . $status);
+            }
+            foreach ($routes as $route) {
+                $beginningOfNewRoute = true;
+                foreach ($route['legs'] as $leg) {
+                    $startLocationLatitude = $leg['start_location']['lat'];
+                    $endLocationLatitude = $leg['end_location']['lat'];
+                    $startLocationLongitude = $leg['start_location']['lng'];
+                    $endLocationLongitude = $leg['end_location']['lng'];
+
+                    $startLocation = Node::createIfNotExist($startLocationLatitude, $startLocationLongitude);
+
+                    foreach ($leg['steps'] as $step) {
+                        $startLatitude = $step['start_location']['lat'];
+                        $endLatitude = $step['end_location']['lat'];
+                        $startLongitude = $step['start_location']['lng'];
+                        $endLongitude = $step['end_location']['lng'];
+
+                        // Get start coordinate and save it if node doesn't exist
+                        $startNode = Node::createIfNotExist($startLatitude, $startLongitude);
+
+                        // Get end coordinate and save it if node doesn't exist
+                        $endNode = Node::createIfNotExist($endLatitude, $endLongitude);
+
+                        if ($beginningOfNewRoute) {
+                            $beginningOfNewRoute = false;
+
+                            $originNode = Node::createIfNotExist($originCoordinate[0], $originCoordinate[1]);
+
+                            if ($originNode->Id != $startLocation->Id) {
+                                NeighboringNode::createIfNotExist($originNode->Id, $startLocation->Id);
                             }
 
-                            // Get end coordinate and save it if node doesn't exist
-                            $endNode = Node::model()->find("Latitude=$endLatitude AND Longitude=$endLongitude");
-                            if (Node::model()->find("Latitude=$endLatitude AND Longitude=$endLongitude") === null) {
-                                $endNode = new Node();
-                                $endNode->Latitude = $endLatitude;
-                                $endNode->Longitude = $endLongitude;
-                                $endNode->save();
+                            if ($startNode->Id != $startLocation->Id) {
+                                NeighboringNode::createIfNotExist($startNode->Id, $startLocation->Id);
                             }
-
-                            if ($beginningOfNewRoute) {
-                                $beginningOfNewRoute = false;
-                                if ($startLocation->Id != $batch->school->NodeId) {
-                                    NeighboringNode::createIfNotExist($startLocation->Id, $batch->school->NodeId);
-                                }
-                                if ($startNode->Id != $startLocation->Id) {
-                                    NeighboringNode::createIfNotExist($startNode->Id, $startLocation->Id);
-                                }
-                            }
-                            NeighboringNode::createIfNotExist($startNode->Id, $endNode->Id, $step['distance']['value']);
                         }
-                        $endLocation = Node::model()->find("Latitude=$endLocationLatitude AND Longitude=$endLocationLongitude");
+                        NeighboringNode::createIfNotExist($startNode->Id, $endNode->Id, $step['distance']['value']);
+                    }
+                    $endLocation = Node::model()->find("Latitude=$endLocationLatitude AND Longitude=$endLocationLongitude");
+                    if ($endNode->Id != $endLocation->Id) {
+                        NeighboringNode::createIfNotExist($endNode->Id, $endLocation->NodeId);
+                    }
 
-                        if ($endNode->Id != $endLocation->Id) {
-                            NeighboringNode::createIfNotExist($endNode->Id, $endLocation->NodeId);
-                        }
+                    $finalNode = Node::createIfNotExist($destinationCoordinate[0], $destinationCoordinate[1]);
+                    if ($finalNode->Id != $endLocation->Id) {
+                        NeighboringNode::createIfNotExist($finalNode->Id, $endLocation->Id);
                     }
                 }
-                $batch->LastModified = date(Yii::app()->params->dbDateFormat);
-                $batch->save();
-                $transaction->commit();
-            } catch (Exception $ex) {
-                $transaction->rollback();
-                $this->renderText($ex->getMessage() . "<br /> " . $ex->getTraceAsString());
             }
+            $transaction->commit();
+        } catch (Exception $ex) {
+            $transaction->rollback();
+            $this->renderText($ex->getMessage() . "<br /> " . $ex->getTraceAsString());
         }
 
         $this->renderText("Done");
